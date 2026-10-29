@@ -1,0 +1,22 @@
+{
+  "name": "todo-app",
+  "version": "1.0.0",
+  "description": "Zero-dependency Todo app used as a tenant repository for the self-healing deployment platform",
+  "main": "index.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "todo",
+    "demo",
+    "self-healing",
+    "tenant"
+  ],
+  "license": "MIT"
+}

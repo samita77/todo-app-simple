@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Todo — self-healing platform fixture</title>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --muted: #64748b;
+      --accent: #0f172a;
+      --success: #22c55e;
+      --danger: #ef4444;
+      --radius: 12px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+
+    main {
+      max-width: 640px;
+      margin: 0 auto;
+      padding: 48px 20px 80px;
+    }
+
+    header h1 {
+      margin: 0 0 4px;
+      font-size: 28px;
+      letter-spacing: -0.02em;
+    }
+
+    header p {
+      margin: 0 0 28px;
+      color: var(--muted);
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: 0 1px 2px rgb(15 23 42 / 0.04);
+    }
+
+    form.add {
+      display: flex;
+      gap: 8px;
+      padding: 10px;
+      margin-bottom: 18px;
+    }
+
+    form.add input {
+      flex: 1;
+      min-width: 0;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      font: inherit;
+      color: inherit;
+      background: var(--bg);
+    }
+
+    form.add input:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 1px;
+    }
+
+    button {
+      font: inherit;
+      cursor: pointer;
+      border-radius: 8px;
+      border: 1px solid transparent;
+      padding: 10px 16px;
+      background: var(--accent);
+      color: #fff;
+      transition: opacity 0.15s ease;
+    }
+
+    button:hover { opacity: 0.88; }
+    button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    ul.todos {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    ul.todos li {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 13px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    ul.todos li:last-child { border-bottom: 0; }
+
+    ul.todos input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--success);
+      cursor: pointer;
+      flex: 0 0 auto;
+    }
+
+    ul.todos .title {
+      flex: 1;
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+
+    ul.todos .title.done {
+      color: var(--muted);
+      text-decoration: line-through;
+    }
+
+    ul.todos .delete {
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--muted);
+      padding: 5px 10px;
+      font-size: 13px;
+    }
+
+    ul.todos .delete:hover { color: var(--danger); border-color: var(--danger); }
+
+    .empty {
+      padding: 36px 16px;
+      text-align: center;
+      color: var(--muted);
+    }
+
+    .meta {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 12px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .error {
+      margin-top: 14px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      background: #fef2f2;
+      color: #991b1b;
+      border: 1px solid #fecaca;
+      font-size: 14px;
+    }
+
+    .error[hidden] { display: none; }
+
+    .dot {
+      display: inline-block;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--success);
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Todo</h1>
+      <p>A tiny tenant app for the self-healing deployment platform.</p>
+    </header>
+
+    <form class="add card" id="add-form" autocomplete="off">
+      <input id="new-title" name="title" maxlength="200" placeholder="What needs doing?" aria-label="Todo title" required />
+      <button type="submit" id="add-button">Add</button>
+    </form>
+
+    <div class="card">
+      <ul class="todos" id="list" aria-live="polite"></ul>
+      <div class="empty" id="empty" hidden>Nothing here yet. Add your first todo.</div>
+    </div>
+
+    <div class="meta">
+      <span id="count">0 todos</span>
+      <span><span class="dot"></span><a href="/health" style="color:inherit">health</a> · <a href="/metrics" style="color:inherit">metrics</a></span>
+    </div>
+
+    <div class="error" id="error" role="alert" hidden></div>
+  </main>
+
+  <script>
+    const list = document.getElementById('list');
+    const empty = document.getElementById('empty');
+    const count = document.getElementById('count');
+    const form = document.getElementById('add-form');
+    const input = document.getElementById('new-title');
+    const addButton = document.getElementById('add-button');
+    const errorBox = document.getElementById('error');
+
+    function showError(message) {
+      errorBox.textContent = message;
+      errorBox.hidden = false;
+      clearTimeout(showError.timer);
+      showError.timer = setTimeout(() => { errorBox.hidden = true; }, 4000);
+    }
+
+    async function api(path, options = {}) {
+      const response = await fetch(path, {
+        headers: { 'Content-Type': 'application/json' },
+        ...options,
+      });
+
+      if (!response.ok) {
+        let message = `Request failed (${response.status})`;
+        try {
+          const body = await response.json();
+          if (body.error) message = body.error;
+        } catch { /* keep default message */ }
+        throw new Error(message);
+      }
+
+      return response.status === 204 ? null : response.json();
+    }
+
+    function render(todos) {
+      list.replaceChildren();
+
+      for (const todo of todos) {
+        const item = document.createElement('li');
+
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.checked = todo.completed;
+        checkbox.setAttribute('aria-label', `Mark "${todo.title}" complete`);
+        checkbox.addEventListener('change', () => toggle(todo, checkbox));
+
+        const title = document.createElement('span');
+        title.className = 'title' + (todo.completed ? ' done' : '');
+        title.textContent = todo.title;
+
+        const del = document.createElement('button');
+        del.className = 'delete';
+        del.type = 'button';
+        del.textContent = 'Delete';
+        del.addEventListener('click', () => remove(todo));
+
+        item.append(checkbox, title, del);
+        list.append(item);
+      }
+
+      empty.hidden = todos.length > 0;
+      count.textContent = `${todos.length} ${todos.length === 1 ? 'todo' : 'todos'}`;
+    }
+
+    async function refresh() {
+      try {
+        const data = await api('/api/todos');
+        render(data.todos);
+      } catch (error) {
+        showError(error.message);
+      }
+    }
+
+    async function toggle(todo, checkbox) {
+      checkbox.disabled = true;
+      try {
+        await api(`/api/todos/${todo.id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ completed: checkbox.checked }),
+        });
+        await refresh();
+      } catch (error) {
+        checkbox.checked = !checkbox.checked;
+        showError(error.message);
+      } finally {
+        checkbox.disabled = false;
+      }
+    }
+
+    async function remove(todo) {
+      try {
+        await api(`/api/todos/${todo.id}`, { method: 'DELETE' });
+        await refresh();
+      } catch (error) {
+        showError(error.message);
+      }
+    }
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const title = input.value.trim();
+      if (!title) return;
+
+      addButton.disabled = true;
+      try {
+        await api('/api/todos', {
+          method: 'POST',
+          body: JSON.stringify({ title }),
+        });
+        input.value = '';
+        await refresh();
+      } catch (error) {
+        showError(error.message);
+      } finally {
+        addButton.disabled = false;
+        input.focus();
+      }
+    });
+
+    refresh();
+  </script>
+</body>
+</html>
