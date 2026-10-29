@@ -1,9 +1,8 @@
 # Todo App — tenant fixture
 
 A deliberately small, **zero-dependency** Todo application used as the demo tenant for the
-[self-healing deployment platform](../README.md). The platform clones this repository, runs its
-tests, builds the Docker image, deploys it to Kubernetes, then health-checks it and rolls back if
-the score degrades.
+self-healing deployment platform. The platform clones this repository, runs its tests, builds the
+Docker image, deploys it to Kubernetes, then health-checks it and rolls back if the score degrades.
 
 This app is **not** part of the platform. It is a normal user project — the kind any developer would
 register — which is exactly what makes it useful as a test fixture.
